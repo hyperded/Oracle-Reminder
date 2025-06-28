@@ -1,3 +1,4 @@
+const fs = require('fs');
 const { Client, Events, GatewayIntentBits, GuildMessageManager, ChannelType, Partials } = require('discord.js');
 const { token } = require('./config.json');
 
@@ -104,7 +105,7 @@ client.on('messageCreate', message =>
 				}
 				else
 				{
-					save_to_prerequesites(message.guild.id, channel_id);
+					bsave_to_prerequesites(message.guild.id, channel_id);
 				}
 			}
 		}
@@ -113,7 +114,33 @@ client.on('messageCreate', message =>
 	}
 })
 
-function save_to_prerequesites(server_id, channel_id)
+async function save_to_prerequesites(server_id, channel_id)
 {
+	const file_path = "/prerequesites/data.json";
+	try
+	{
+		let prev_data = await fs.readFile(file_path);
+		let json_data = JSON.parse(prev_data);
 
+		if (json_data.servers.includes(server_id))
+		// previous data from data.json
+		{
+			json_data.servers.server_id.channel_id.push(channel_id)
+			
+		}
+
+		else
+		// brand new data
+		{
+			json_data.servers.push({
+				server_id: channel_id
+			})
+		}
+
+		await fs.writeFile(file_path, JSON.stringify(json_data, null, '\t'));
+	}
+	catch(error)
+	{
+		console.log(error);
+	}
 }
