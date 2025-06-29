@@ -1,4 +1,4 @@
-const fs = require('fs');
+const fs = require('fs').promises;
 const { Client, Events, GatewayIntentBits, GuildMessageManager, ChannelType, Partials } = require('discord.js');
 const { token } = require('./config.json');
 
@@ -40,10 +40,10 @@ client.on('messageCreate', message =>
 		{
 			message.channel.send("On it rn! ")
 		}
-		else if (message.channel.type == 0)
+		else if (message.channel.type === ChannelType.GuildText)
+			// only do this if a message is from a server
 		{
 			message.channel.send("On it rn! ")
-
 		}
 	}
 
@@ -67,10 +67,10 @@ client.on('messageCreate', message =>
 			let arg = args[i];
 			if (flags.includes(arg))
 			{
-				let value = flags[i + 1]
+				let value = args[i + 1]
 				if (value && !flags.includes(value))
 				{
-					parsed[flag] = value;
+					parsed[arg] = value;
 					i+=2;
 				}
 				else
@@ -97,7 +97,7 @@ client.on('messageCreate', message =>
 				let value = parsed[key];
 				let channel_id = message.guild.channels.cache.find(
 					ch => ch.name === value
-				)
+				);
 				if (!channel_id)
 				{
 					// sends error channel not found
@@ -105,7 +105,7 @@ client.on('messageCreate', message =>
 				}
 				else
 				{
-					save_to_prerequesites(message.guild.id, channel_id);
+					save_to_prerequesites(message.guild.id, channel_id.id);
 				}
 			}
 		}
@@ -116,34 +116,44 @@ client.on('messageCreate', message =>
 
 async function save_to_prerequesites(server_id, channel_id)
 {
-	const file_path = "/prerequesites/data.json";
+	const file_path = "./prerequesites/data.json";
+	let json_data = { servers: {} };
 	try
 	{
-		let prev_data = await fs.readFile(file_path);
-		let json_data = JSON.parse(prev_data);
+		
+		let prev_data = await fs.readFile(file_path, 'utf-8');
+		
+		json_data = JSON.parse(prev_data);
+		const server_entry = json_data.servers[server_id];
 
-		if (json_data.servers.includes(server_id))
-		// previous data from data.json
+		if (!json_data.servers)
 		{
-			if (!json_data.servers.server_id.includes(channel_id))
+			json_data.servers = {};
+		}
+
+		if (json_data.servers[server_id])
+		{
+			if(json_data.servers[server_id].includes(channel_id))
 			{
-				json_data.servers.server_id.channel_id.push(channel_id)
+				await message.channel.send("Channel already added!");
+				return;
 			}
 			else
 			{
-				message.channel.send("Channel already added!");
+				json_data.servers[server_id].push(channel_id);
 			}
 		}
-
 		else
 		// brand new data
 		{
-			json_data.servers.push({
-				server_id: channel_id
-			})
+			json_data.servers[server_id] = [channel_id];
 		}
 
+		await fs.mkdir("./prerequesites", {recursive: true});
+
 		await fs.writeFile(file_path, JSON.stringify(json_data, null, '\t'));
+		await message.channel.send("Channel added!");
+		
 	}
 	catch(error)
 	{
