@@ -105,7 +105,7 @@ client.on('messageCreate', message =>
 				}
 				else
 				{
-					bsave_to_prerequesites(message.guild.id, channel_id);
+					save_to_prerequesites(message.guild.id, channel_id);
 				}
 			}
 		}
@@ -125,8 +125,14 @@ async function save_to_prerequesites(server_id, channel_id)
 		if (json_data.servers.includes(server_id))
 		// previous data from data.json
 		{
-			json_data.servers.server_id.channel_id.push(channel_id)
-			
+			if (!json_data.servers.server_id.includes(channel_id))
+			{
+				json_data.servers.server_id.channel_id.push(channel_id)
+			}
+			else
+			{
+				message.channel.send("Channel already added!");
+			}
 		}
 
 		else
