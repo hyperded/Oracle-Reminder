@@ -2,6 +2,11 @@ const fs = require('fs').promises;
 const { Client, Events, GatewayIntentBits, GuildMessageManager, ChannelType, Partials } = require('discord.js');
 const { token } = require('./config.json');
 
+const PREREQUISITES_PATH = "./prerequisites/data.json";
+const CREATE_CHANNEL_FLAGS = ["--channel-name"]
+const TEXT_COMMANDS = ["add channel", "remove channel"]
+
+
 // Create a new client instance
 const client = new Client({
 	intents: [GatewayIntentBits.Guilds,
@@ -11,6 +16,9 @@ const client = new Client({
 		
 		partials: [Partials.Channel, Partials.Message]
 	});
+
+// Create a folder to save prerequisites.
+fs.mkdir("./prerequisites", {recursive: true});
 
 client.once(Events.ClientReady, async readyClient => {
 	console.log(`Ready! Logged in as ${readyClient.user.tag}`);
@@ -47,8 +55,8 @@ client.on('messageCreate', message =>
 		}
 	}
 
-
-	else if (message.content.startsWith("add channel") && message.type != ChannelType.DM)
+	// TODO: make it so that this checks for every command in TEXT_COMMANDS.
+	else if (message.content.startsWith("add channel") && message.channel.type != ChannelType.DM)
 		/*		
 			Updating the channels list available for that server
 			so that it can scales more than just hard coding it.
@@ -57,7 +65,7 @@ client.on('messageCreate', message =>
 		*/
 	{
 
-		const flags = ["--channel-name"]
+		
 		let args = message.content.slice("add channel".length).trim().split(/\s+/)
 
 		// Parsing.
@@ -65,10 +73,10 @@ client.on('messageCreate', message =>
 		for (let i = 0; i < args.length;)
 		{
 			let arg = args[i];
-			if (flags.includes(arg))
+			if (CREATE_CHANNEL_FLAGS.includes(arg))
 			{
 				let value = args[i + 1]
-				if (value && !flags.includes(value))
+				if (value && !CREATE_CHANNEL_FLAGS.includes(value))
 				{
 					parsed[arg] = value;
 					i+=2;
@@ -100,31 +108,46 @@ client.on('messageCreate', message =>
 				);
 				if (!channel_id)
 				{
-					// sends error channel not found
 					message.channel.send("Channel not found?");
 				}
 				else
 				{
-					save_to_prerequesites(message.guild.id, channel_id.id);
+					save_to_prerequesites(message.guild.id, channel_id.id, message.channel);
 				}
 			}
 		}
 		
 
 	}
+	// else if (message.content.startsWith("delete message") && message.channel.type != ChannelType.DM)
+	// {
+		
+	// }
 })
 
-async function save_to_prerequesites(server_id, channel_id)
+async function save_to_prerequesites(server_id, channel_id, msg_source)
+/*
+	server_id and channel_id: server ID and channel ID
+	msg_source: the user's command channel location - channel obj.
+*/
 {
-	const file_path = "./prerequesites/data.json";
 	let json_data = { servers: {} };
 	try
 	{
-		
-		let prev_data = await fs.readFile(file_path, 'utf-8');
-		
+		let prev_data = await fs.readFile(PREREQUISITES_PATH, 'utf-8');
 		json_data = JSON.parse(prev_data);
-		const server_entry = json_data.servers[server_id];
+	}
+	catch(readError)
+	{
+		if (readError.code !== 'ENOENT')
+		{
+			console.log(readError);
+			await msg_source.send("An error occurred while reading prerequisites.");
+            return;
+		}
+	}
+	try
+	{
 
 		if (!json_data.servers)
 		{
@@ -135,7 +158,7 @@ async function save_to_prerequesites(server_id, channel_id)
 		{
 			if(json_data.servers[server_id].includes(channel_id))
 			{
-				await message.channel.send("Channel already added!");
+				await msg_source.send("Channel already added!");
 				return;
 			}
 			else
@@ -149,11 +172,9 @@ async function save_to_prerequesites(server_id, channel_id)
 			json_data.servers[server_id] = [channel_id];
 		}
 
-		await fs.mkdir("./prerequesites", {recursive: true});
+		await fs.writeFile(PREREQUISITES_PATH, JSON.stringify(json_data, null, '\t'));
+		await msg_source.send("Channel added!");
 
-		await fs.writeFile(file_path, JSON.stringify(json_data, null, '\t'));
-		await message.channel.send("Channel added!");
-		
 	}
 	catch(error)
 	{
