@@ -6,7 +6,7 @@ const { channel } = require('diagnostics_channel');
 const PREREQUISITES_PATH = "./prerequisites/data.json";
 const TEXT_COMMANDS = ["add channel", "remove channel"]
 
-
+const ALLOWED_GUILD_IDS = ["1387746418936250368"];
 // Create a new client instance
 const client = new Client({
 	intents: [GatewayIntentBits.Guilds,
@@ -24,21 +24,32 @@ client.once(Events.ClientReady, async readyClient => {
 	console.log(`Ready! Logged in as ${readyClient.user.tag}`);
 
 	// getting prequesites 
-	// try
-	// {
+	let json_data = { servers: {} };
+	try
+	{
+		let prev_data = await fs.readFile(PREREQUISITES_PATH, 'utf-8');
+		json_data = JSON.parse(prev_data);
 		
-	// }
-	// catch(e)
-	// {
-	// 	console.log(e)
-	// }
+	}
+
+	catch(readError)
+	{
+		if (readError.code !== 'ENOENT')
+		{
+			console.log(readError);
+			await msg_source.send("An error occurred while reading prerequisites.");
+			console.log("CRITICAL ERROR !!");
+            return;
+		}
+	}
+	
 });
 
 // Log in to Discord with your client's token
 client.login(token);
 client.on('messageCreate', message =>
 {
-	let found_command = TEXT_COMMANDS.some(cmd => message.content.startsWith(cmd));
+	let found_command = TEXT_COMMANDS.find(cmd => message.content.startsWith(cmd));
 	if (message.content === "update")
 		/*
 		Get Live Update from the console.
@@ -73,23 +84,22 @@ client.on('messageCreate', message =>
 				add_channel_via_msg(message.channel, parsed);
 				break;
 
-			case 'delete channel':
+			case 'remove channel':
 			/* 
 				Don't want that channel anymore? use this to delete
 
 				Usage:
-				delete channel => delete the current channel from the prerequisites file
-				delete channel <Channel name> => deletes the channel with the given name;
+				remove channel => delete the current channel from the prerequisites file
+				remove channel <Channel name> => deletes the channel with the given name;
 			*/
 
-				remove_channel_via_msg(message, parsed)
+				remove_channel_via_msg(message.channel, parsed)
 				break;
 			default:
 				return;
 
 		}
 
-		
 
 	}
 })
@@ -208,7 +218,7 @@ async function remove_from_prerequisites(server_id, channel_id, msg_source)
 	{
 		if (!json_data.servers)
 		{
-			msg_source.send("Internal Error");	
+			await msg_source.send("Internal Error");	
 			console.log("json_data.servers not found!!");
 			return;
 		}
@@ -217,7 +227,7 @@ async function remove_from_prerequisites(server_id, channel_id, msg_source)
 		{
 			if(!json_data.servers[server_id].includes(channel_id))
 			{
-				msg_source.send("Channel name does not exist in the \"db\" !");
+				await msg_source.send("Channel name does not exist in the \"db\" !");
 				return;
 			}
 			else
@@ -228,11 +238,11 @@ async function remove_from_prerequisites(server_id, channel_id, msg_source)
 		else
 		// server isnt added yet
 		{
-			msg_source.send("Server does not exist in the \"db\" !")
+			await msg_source.send("Server does not exist in the \"db\" !")
 		}
 
 		await fs.writeFile(PREREQUISITES_PATH, JSON.stringify(json_data, null, '\t'));
-		msg_source.send("Channel removed!");
+		await msg_source.send("Channel removed!");
 
 	}
 	catch(error)
@@ -253,7 +263,7 @@ function add_channel_via_msg(msg_source, parsed)
 
 	{
 		let server_id = msg_source.guild.id;
-		let channel_id = msg_source.channel.id;
+		let channel_id = msg_source.id;
 		save_to_prerequisites(server_id, channel_id, msg_source);
 	}
 
@@ -301,7 +311,7 @@ function remove_channel_via_msg(msg_source, parsed)
 
 	{
 		let server_id = msg_source.guild.id;
-		let channel_id = msg_source.channel.id;
+		let channel_id = msg_source.id;
 		remove_from_prerequisites(server_id, channel_id, msg_source);
 	}
 
